@@ -82,13 +82,686 @@ const ESTILOS_GLOBAIS = `
   }
 
   .ld-btn.icon {
-    padding: 8px 12px;
-    min-width: 42px;
+    padding: 5px 6px;
+    min-width: 32px;
     justify-content: center;
     font-size: 16px;
   }
 `;
 
+// ═══════════════════════════════════════════════════════════
+//  COMPONENTE: VistaMensagens
+// ═══════════════════════════════════════════════════════════
+function VistaMensagens({
+  conectado, enviar,
+  smsThreads, smsMensagens,
+  smsSelecionado, setSmsSelecionado,
+  smsInput, setSmsInput,
+  smsLoading, setSmsLoading,
+}) {
+  const formatarData = (ms) => {
+    const d = new Date(ms);
+    const hoje = new Date();
+    const mesmoDia = d.toDateString() === hoje.toDateString();
+    if (mesmoDia) return d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) +
+           ' ' + d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  if (!conectado) {
+    return (
+      <div style={{ color: '#7a8ba3', fontSize: 14 }}>
+        Liga-te ao telemóvel primeiro (tab 🖥️ Espelhamento → botão Ligar)
+      </div>
+    );
+  }
+
+  if (smsSelecionado) {
+    return (
+      <div style={{
+        width: '100%', height: '100%',
+        display: 'flex', flexDirection: 'column',
+        maxWidth: 800, margin: '0 auto',
+        background: 'rgba(10, 14, 24, 0.6)',
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 16px',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(15, 22, 38, 0.9)',
+        }}>
+          <button
+            onClick={() => {
+              setSmsSelecionado(null);
+              setSmsMensagens([]);
+            }}
+            style={{
+              background: 'none', border: 'none',
+              color: '#8ec2ff', cursor: 'pointer', fontSize: 20,
+            }}
+          >←</button>
+          <div style={{ fontWeight: 600, fontSize: 15 }}>{smsSelecionado}</div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {smsMensagens.map(m => {
+            const enviada = m.type === 2;
+            return (
+              <div
+                key={m.id}
+                style={{
+                  alignSelf: enviada ? 'flex-end' : 'flex-start',
+                  maxWidth: '75%',
+                  padding: '8px 12px',
+                  borderRadius: 14,
+                  background: enviada
+                    ? 'linear-gradient(135deg, #2b7fff 0%, #1a5fd6 100%)'
+                    : 'rgba(255,255,255,0.08)',
+                  color: enviada ? '#fff' : '#e8ecf3',
+                  fontSize: 13.5,
+                  lineHeight: 1.4,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {m.body}
+                <div style={{
+                  fontSize: 10, opacity: 0.65, marginTop: 4, textAlign: 'right',
+                }}>
+                  {formatarData(m.date)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{
+          display: 'flex', gap: 8, padding: 12,
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(15, 22, 38, 0.9)',
+        }}>
+          <input
+            type="text"
+            value={smsInput}
+            onChange={(e) => setSmsInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && smsInput.trim()) {
+                enviar({
+                  action: 'sms_send',
+                  address: smsSelecionado,
+                  body: smsInput.trim(),
+                });
+              }
+            }}
+            placeholder="Escreve uma mensagem..."
+            style={{
+              flex: 1, padding: '10px 14px',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(120,180,255,0.2)',
+              borderRadius: 10, color: '#fff',
+              fontSize: 14, outline: 'none',
+            }}
+          />
+          <button
+            onClick={() => {
+              if (!smsInput.trim()) return;
+              enviar({
+                action: 'sms_send',
+                address: smsSelecionado,
+                body: smsInput.trim(),
+              });
+            }}
+            disabled={!smsInput.trim()}
+            className="ld-btn primary"
+            style={{ padding: '10px 20px' }}
+          >
+            Enviar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      maxWidth: 800, margin: '0 auto',
+      display: 'flex', flexDirection: 'column',
+      background: 'rgba(10, 14, 24, 0.6)',
+    }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '12px 16px',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        background: 'rgba(15, 22, 38, 0.9)',
+      }}>
+        <div style={{ fontWeight: 600, fontSize: 15 }}>
+          💬 Conversas ({smsThreads.length})
+        </div>
+        <button
+          onClick={() => {
+            setSmsLoading(true);
+            enviar({ action: 'sms_threads' });
+          }}
+          disabled={smsLoading}
+          style={{
+            background: 'rgba(43,127,255,0.15)',
+            border: '1px solid rgba(43,127,255,0.35)',
+            color: '#8ec2ff',
+            padding: '6px 12px', borderRadius: 8,
+            cursor: 'pointer', fontSize: 12,
+          }}
+        >
+          {smsLoading ? '⏳ A carregar...' : '🔄 Atualizar'}
+        </button>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {smsThreads.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#7a8ba3', fontSize: 13 }}>
+            {smsLoading ? 'A carregar SMS do telemóvel...' : 'Sem conversas.'}
+          </div>
+        ) : smsThreads.map(t => (
+          <button
+            key={t.address}
+            onClick={() => {
+              setSmsSelecionado(t.address);
+              setSmsMensagens([]);
+              setSmsLoading(true);
+              enviar({ action: 'sms_messages', address: t.address });
+            }}
+            style={{
+              display: 'block', width: '100%',
+              padding: '12px 16px',
+              background: 'none', border: 'none',
+              borderBottom: '1px solid rgba(255,255,255,0.04)',
+              color: '#e8ecf3', textAlign: 'left',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(43,127,255,0.1)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>
+                {t.address}
+                {t.unread > 0 && (
+                  <span style={{
+                    marginLeft: 8,
+                    background: '#2b7fff', color: '#fff',
+                    borderRadius: 10, padding: '1px 7px', fontSize: 11,
+                  }}>
+                    {t.unread}
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: '#7a8ba3' }}>
+                {formatarData(t.lastDate)}
+              </div>
+            </div>
+            <div style={{
+              fontSize: 12.5, color: '#a8b4c8', marginTop: 4,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {t.lastBody}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+//  COMPONENTE: VistaChamadas
+// ═══════════════════════════════════════════════════════════
+function VistaChamadas({
+  conectado, enviar,
+  chamadas, chamadasLoading, setChamadasLoading,
+  chamadaSelecionada, setChamadaSelecionada,
+}) {
+  const formatarData = (ms) => {
+    const d = new Date(ms);
+    const hoje = new Date();
+    const ontem = new Date(hoje); ontem.setDate(ontem.getDate() - 1);
+    const hora = d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+    if (d.toDateString() === hoje.toDateString()) return `hoje ${hora}`;
+    if (d.toDateString() === ontem.toDateString()) return `ontem ${hora}`;
+    return d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' }) + ' ' + hora;
+  };
+
+  const formatarDuracao = (seg) => {
+    if (seg <= 0) return 'sem resposta';
+    if (seg < 60) return `${seg} s`;
+    const m = Math.floor(seg / 60);
+    const s = seg % 60;
+    return s > 0 ? `${m} min ${s} s` : `${m} min`;
+  };
+
+  const metaTipo = (tipo) => {
+    switch (tipo) {
+      case 1: return { icon: '⬇️', label: 'Recebida',   cor: '#22c55e' };
+      case 2: return { icon: '⬆️', label: 'Efectuada',  cor: '#2b7fff' };
+      case 3: return { icon: '❌', label: 'Perdida',    cor: '#ff4d5e' };
+      case 4: return { icon: '📩', label: 'Voicemail',  cor: '#a855f7' };
+      case 5: return { icon: '🚫', label: 'Rejeitada',  cor: '#f59e0b' };
+      case 6: return { icon: '⛔', label: 'Bloqueada',  cor: '#6b7280' };
+      default: return { icon: '📞', label: 'Chamada',   cor: '#7ea2d4' };
+    }
+  };
+
+  if (!conectado) {
+    return (
+      <div style={{ color: '#7a8ba3', fontSize: 14 }}>
+        Liga-te ao telemóvel primeiro (tab 🖥️ Espelhamento → botão Ligar)
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      maxWidth: 800, margin: '0 auto',
+      display: 'flex', flexDirection: 'column',
+      background: 'rgba(10, 14, 24, 0.6)',
+    }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '12px 16px',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        background: 'rgba(15, 22, 38, 0.9)',
+      }}>
+        <div style={{ fontWeight: 600, fontSize: 15 }}>
+          📞 Chamadas ({chamadas.length})
+        </div>
+        <button
+          onClick={() => {
+            setChamadasLoading(true);
+            enviar({ action: 'call_log', limit: 200 });
+          }}
+          disabled={chamadasLoading}
+          style={{
+            background: 'rgba(43,127,255,0.15)',
+            border: '1px solid rgba(43,127,255,0.35)',
+            color: '#8ec2ff',
+            padding: '6px 12px', borderRadius: 8,
+            cursor: 'pointer', fontSize: 12,
+          }}
+        >
+          {chamadasLoading ? '⏳ A carregar...' : '🔄 Atualizar'}
+        </button>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {chamadas.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#7a8ba3', fontSize: 13 }}>
+            {chamadasLoading ? 'A carregar registo de chamadas...' : 'Sem chamadas.'}
+          </div>
+        ) : chamadas.map(c => {
+          const meta = metaTipo(c.type);
+          const nomeMostrar = c.name && c.name.trim() ? c.name : c.number;
+          return (
+            <button
+              key={c.id}
+              onClick={() => setChamadaSelecionada(c)}
+              style={{
+                display: 'block', width: '100%',
+                padding: '12px 16px',
+                background: c.new ? 'rgba(43,127,255,0.05)' : 'none',
+                border: 'none',
+                borderBottom: '1px solid rgba(255,255,255,0.04)',
+                color: '#e8ecf3', textAlign: 'left',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(43,127,255,0.1)'}
+              onMouseLeave={e => e.currentTarget.style.background = c.new ? 'rgba(43,127,255,0.05)' : 'none'}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>{meta.icon}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{
+                      fontWeight: 600, fontSize: 14,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {nomeMostrar}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: meta.cor, marginTop: 2 }}>
+                      {meta.label} · {formatarDuracao(c.duration)}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: '#7a8ba3', flexShrink: 0, marginLeft: 8 }}>
+                  {formatarData(c.date)}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {chamadaSelecionada && (
+        <div
+          onClick={() => setChamadaSelecionada(null)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.7)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 100,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: 340, padding: 24,
+              background: 'rgba(15, 22, 38, 0.98)',
+              borderRadius: 16,
+              border: '1px solid rgba(120,180,255,0.3)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.8)',
+              display: 'flex', flexDirection: 'column', gap: 14,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>
+                {chamadaSelecionada.name && chamadaSelecionada.name.trim()
+                  ? chamadaSelecionada.name
+                  : chamadaSelecionada.number}
+              </div>
+              <button
+                onClick={() => setChamadaSelecionada(null)}
+                style={{ background: 'none', border: 'none', color: '#ff6b7a', cursor: 'pointer', fontSize: 18 }}
+              >✕</button>
+            </div>
+
+            <div style={{ fontSize: 12.5, color: '#8a9bb3', lineHeight: 1.7 }}>
+              <div><b>Número:</b> {chamadaSelecionada.number}</div>
+              <div><b>Tipo:</b> {metaTipo(chamadaSelecionada.type).label}</div>
+              <div><b>Data:</b> {new Date(chamadaSelecionada.date).toLocaleString('pt-PT')}</div>
+              <div><b>Duração:</b> {formatarDuracao(chamadaSelecionada.duration)}</div>
+            </div>
+
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+//  COMPONENTE: VistaFotos
+// ═══════════════════════════════════════════════════════════
+function VistaFotos({
+  conectado, enviar,
+  fotos, fotosLoading, setFotosLoading,
+  fotoThumbs,
+  fotoAberta, setFotoAberta,
+  fotoCarregando, setFotoCarregando,
+  fotoPreviewUrl, setFotoPreviewUrl,
+  fotoBytes,
+}) {
+  const thumbnailsPedidosRef = useRef(new Set());
+
+  useEffect(() => {
+    if (fotos.length === 0) return;
+    const pendentes = fotos.filter(f => !thumbnailsPedidosRef.current.has(f.id));
+    if (pendentes.length === 0) return;
+
+    let i = 0;
+    const timer = setInterval(() => {
+      if (i >= pendentes.length) {
+        clearInterval(timer);
+        return;
+      }
+      thumbnailsPedidosRef.current.add(pendentes[i].id);
+      enviar({ action: 'photos_thumbnail', id: pendentes[i].id });
+      i++;
+    }, 35);
+
+    return () => clearInterval(timer);
+  }, [fotos, enviar]);
+
+  const formatarTamanho = (bytes) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  };
+
+  const formatarData = (ms) => {
+    const d = new Date(ms);
+    return d.toLocaleDateString('pt-PT', {
+      day: '2-digit', month: '2-digit', year: '2-digit',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+
+  const abrirFoto = (foto) => {
+    setFotoAberta(foto);
+    setFotoCarregando(true);
+    setFotoPreviewUrl(null);
+    const reqId = `foto-${foto.id}-${Date.now()}`;
+    enviar({ action: 'photos_full', id: foto.id, reqId });
+  };
+
+  const fecharFoto = () => {
+    if (fotoPreviewUrl) {
+      try { URL.revokeObjectURL(fotoPreviewUrl); } catch {}
+    }
+    setFotoAberta(null);
+    setFotoPreviewUrl(null);
+    setFotoCarregando(false);
+  };
+
+  const descarregar = () => {
+    if (!fotoPreviewUrl || !fotoAberta) return;
+    const a = document.createElement('a');
+    a.href = fotoPreviewUrl;
+    a.download = fotoAberta.name || `foto-${Date.now()}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  if (!conectado) {
+    return (
+      <div style={{ color: '#7a8ba3', fontSize: 14 }}>
+        Liga-te ao telemóvel primeiro (tab 🖥️ Espelhamento → botão Ligar)
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      display: 'flex', flexDirection: 'column',
+      background: 'rgba(10, 14, 24, 0.6)',
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '12px 16px',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        background: 'rgba(15, 22, 38, 0.9)',
+        flexShrink: 0,
+      }}>
+        <div style={{ fontWeight: 600, fontSize: 15 }}>
+          📷 Fotos ({fotos.length})
+        </div>
+        <button
+          onClick={() => {
+            setFotosLoading(true);
+            thumbnailsPedidosRef.current = new Set();
+            enviar({ action: 'photos_list', limit: 500 });
+          }}
+          disabled={fotosLoading}
+          style={{
+            background: 'rgba(43,127,255,0.15)',
+            border: '1px solid rgba(43,127,255,0.35)',
+            color: '#8ec2ff',
+            padding: '6px 12px', borderRadius: 8,
+            cursor: 'pointer', fontSize: 12,
+          }}
+        >
+          {fotosLoading ? '⏳ A carregar...' : '🔄 Atualizar'}
+        </button>
+      </div>
+
+      <div style={{
+        flex: 1, overflowY: 'auto', padding: 12,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+        gap: 8,
+        alignContent: 'start',
+      }}>
+        {fotos.length === 0 ? (
+          <div style={{
+            gridColumn: '1 / -1',
+            padding: 40, textAlign: 'center', color: '#7a8ba3', fontSize: 13,
+          }}>
+            {fotosLoading ? 'A carregar fotos do telemóvel...' : 'Sem fotos.'}
+          </div>
+        ) : fotos.map(f => {
+          const thumb = fotoThumbs[f.id];
+          return (
+            <button
+              key={f.id}
+              onClick={() => abrirFoto(f)}
+              title={`${f.name}\n${formatarData(f.date)}\n${formatarTamanho(f.size)}`}
+              style={{
+                position: 'relative',
+                aspectRatio: '1 / 1',
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: 8,
+                overflow: 'hidden',
+                cursor: 'pointer',
+                padding: 0,
+                transition: 'transform 0.15s ease, border-color 0.15s ease',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'scale(1.02)';
+                e.currentTarget.style.borderColor = 'rgba(120,180,255,0.5)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+              }}
+            >
+              {thumb ? (
+                <img
+                  src={thumb}
+                  alt={f.name}
+                  style={{
+                    width: '100%', height: '100%',
+                    objectFit: 'cover', display: 'block',
+                  }}
+                />
+              ) : (
+                <div style={{
+                  width: '100%', height: '100%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#4a5a73', fontSize: 24,
+                }}>
+                  🖼️
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {fotoAberta && (
+        <div
+          onClick={fecharFoto}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.92)',
+            display: 'flex', flexDirection: 'column',
+            zIndex: 100,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '12px 20px',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(15, 22, 38, 0.95)',
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ color: '#e8ecf3', fontSize: 13 }}>
+              <div style={{ fontWeight: 600 }}>{fotoAberta.name}</div>
+              <div style={{ fontSize: 11, color: '#8a9bb3', marginTop: 2 }}>
+                {formatarData(fotoAberta.date)} · {formatarTamanho(fotoAberta.size)}
+                {fotoAberta.width > 0 && ` · ${fotoAberta.width}×${fotoAberta.height}`}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={descarregar}
+                disabled={!fotoPreviewUrl}
+                className="ld-btn primary"
+                style={{ padding: '8px 16px', fontSize: 13 }}
+              >
+                ⬇️ Descarregar
+              </button>
+              <button
+                onClick={fecharFoto}
+                className="ld-btn"
+                style={{ padding: '8px 16px', fontSize: 13 }}
+              >
+                ✕ Fechar
+              </button>
+            </div>
+          </div>
+
+          <div
+            onClick={fecharFoto}
+            style={{
+              flex: 1, display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              padding: 20, overflow: 'auto',
+            }}
+          >
+            {fotoCarregando ? (
+              <div style={{ color: '#8a9bb3', textAlign: 'center' }}>
+                <div style={{
+                  width: 40, height: 40,
+                  border: '3px solid rgba(255,255,255,0.15)',
+                  borderTopColor: '#2b7fff',
+                  borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite',
+                  margin: '0 auto 12px',
+                }} />
+                A carregar foto...
+              </div>
+            ) : fotoPreviewUrl ? (
+              <img
+                src={fotoPreviewUrl}
+                alt={fotoAberta.name}
+                onClick={e => e.stopPropagation()}
+                style={{
+                  maxWidth: '100%', maxHeight: '100%',
+                  objectFit: 'contain',
+                  borderRadius: 8,
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+                }}
+              />
+            ) : (
+              <div style={{ color: '#ff6b7a' }}>
+                Não foi possível carregar a foto.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+//  COMPONENTE PRINCIPAL
+// ═══════════════════════════════════════════════════════════
 function App() {
   const [status, setStatus] = useState('Escreve o PIN do telemóvel para começar.');
   const [conectado, setConectado] = useState(false);
@@ -100,8 +773,10 @@ function App() {
   const [somSistema, setSomSistema] = useState(false);
   const [somMic, setSomMic] = useState(false);
   const [screenshotRecebendo, setScreenshotRecebendo] = useState(false);
+  const [controloAtivo, setControloAtivo] = useState(true);
 
   const videoRef = useRef(null);
+  const remoteStreamRef = useRef(null);
   const wsRef = useRef(null);
   const pcRef = useRef(null);
   const dataChannelRef = useRef(null);
@@ -128,6 +803,32 @@ function App() {
   const [cameraFrameUrl, setCameraFrameUrl] = useState(null);
   const cameraFrameAnteriorRef = useRef(null);
 
+  // ─── Módulo Mensagens ───
+  const [vistaAtiva, setVistaAtiva] = useState('espelho');
+  const [smsThreads, setSmsThreads] = useState([]);
+  const [smsMensagens, setSmsMensagens] = useState([]);
+  const [smsSelecionado, setSmsSelecionado] = useState(null);
+  const [smsInput, setSmsInput] = useState('');
+  const [smsLoading, setSmsLoading] = useState(false);
+
+  // ─── Módulo Chamadas ───
+  const [chamadas, setChamadas] = useState([]);
+  const [chamadasLoading, setChamadasLoading] = useState(false);
+  const [chamadaSelecionada, setChamadaSelecionada] = useState(null);
+
+  // ─── Módulo Fotos ───
+  const [fotos, setFotos] = useState([]);
+  const [fotosLoading, setFotosLoading] = useState(false);
+  const [fotoThumbs, setFotoThumbs] = useState({});
+  const [fotoAberta, setFotoAberta] = useState(null);
+  const [fotoCarregando, setFotoCarregando] = useState(false);
+  const [fotoPreviewUrl, setFotoPreviewUrl] = useState(null);
+  const [fotoBytes, setFotoBytes] = useState(null)
+    const [modoTV, setModoTV] = useState(false);
+
+
+  const fotoBufferRef = useRef({ reqId: null, chunks: [], total: 0 });
+
   // ─── Gravação ───
   const [gravando, setGravando] = useState(false);
   const [tempoGravacao, setTempoGravacao] = useState(0);
@@ -142,7 +843,7 @@ function App() {
 
   const offerRetryTimeoutRef = useRef(null);
   const tentativasRef = useRef(0);
-  const MAX_TENTATIVAS = 6;
+  const MAX_TENTATIVAS = 10;
 
   const screenshotBufferRef = useRef({ id: null, chunks: [], total: 0 });
 
@@ -198,6 +899,7 @@ function App() {
     try { canal?.close(); } catch (e) { console.warn(e); }
     try { pc?.close(); } catch (e) { console.warn(e); }
     if (videoRef.current) videoRef.current.srcObject = null;
+    remoteStreamRef.current = null;
 
     if (audioCtxRef.current) {
       try { audioCtxRef.current.close(); } catch (e) {}
@@ -244,12 +946,10 @@ function App() {
     const src = ctx.createBufferSource();
     src.buffer = buffer;
 
-    // ─── SEMPRE ligar ao gravador (se está a gravar) ───
     if (audioDestRef.current) {
       try { src.connect(audioDestRef.current); } catch (e) {}
     }
 
-    // ─── Só tocar nos altifalantes se o utilizador ativou ───
     const tocarAltofalantes = fila === 'mic' ? somMicRef.current : somSistemaRef.current;
     if (tocarAltofalantes) {
       src.connect(ctx.destination);
@@ -386,6 +1086,108 @@ function App() {
       return;
     }
 
+    // ─── Handlers Módulo Mensagens ───
+    if (msg.action === 'sms_threads') {
+      setSmsThreads(Array.isArray(msg.threads) ? msg.threads : []);
+      setSmsLoading(false);
+      return;
+    }
+
+    if (msg.action === 'sms_messages') {
+      setSmsMensagens(Array.isArray(msg.messages) ? msg.messages : []);
+      setSmsLoading(false);
+      return;
+    }
+
+    if (msg.action === 'sms_sent') {
+      if (msg.ok) {
+        setSmsMensagens(prev => [...prev, {
+          id: `local-${Date.now()}`,
+          address: msg.address,
+          body: msg.body,
+          date: Date.now(),
+          type: 2,
+          read: true,
+        }]);
+        setSmsInput('');
+        setStatus('SMS enviado.');
+      } else {
+        setStatus('Erro a enviar SMS.');
+      }
+      return;
+    }
+
+    // ─── Handler Módulo Chamadas ───
+    if (msg.action === 'call_log') {
+      setChamadas(Array.isArray(msg.calls) ? msg.calls : []);
+      setChamadasLoading(false);
+      return;
+    }
+
+    // ─── Handlers Módulo Fotos ───
+    if (msg.action === 'photos_list') {
+      const lista = Array.isArray(msg.photos) ? msg.photos : [];
+      setFotos(lista);
+      setFotosLoading(false);
+      setFotoThumbs({});
+      setStatus(`${lista.length} fotos recebidas.`);
+      return;
+    }
+
+    if (msg.action === 'photos_thumbnail') {
+      if (msg.error) return;
+      try {
+        const url = `data:image/jpeg;base64,${msg.data}`;
+        setFotoThumbs(prev => ({ ...prev, [msg.id]: url }));
+      } catch (e) {
+        console.warn('Erro thumbnail:', e);
+      }
+      return;
+    }
+
+    if (msg.action === 'photo_start') {
+      fotoBufferRef.current = {
+        reqId: msg.reqId,
+        chunks: new Array(msg.total),
+        total: msg.total,
+      };
+      return;
+    }
+
+    if (msg.action === 'photo_chunk') {
+      const b = fotoBufferRef.current;
+      if (b.reqId === msg.reqId) b.chunks[msg.index] = msg.data;
+      return;
+    }
+
+    if (msg.action === 'photo_end') {
+      const b = fotoBufferRef.current;
+      if (b.reqId !== msg.reqId) return;
+      try {
+        const base64 = b.chunks.join('');
+        const bin = atob(base64);
+        const arr = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+        const blob = new Blob([arr], { type: 'image/jpeg' });
+        const url = URL.createObjectURL(blob);
+        setFotoPreviewUrl(url);
+        setFotoBytes(arr);
+        setFotoCarregando(false);
+        setStatus('Foto carregada.');
+      } catch (e) {
+        console.error('Erro a processar foto:', e);
+        setFotoCarregando(false);
+      }
+      fotoBufferRef.current = { reqId: null, chunks: [], total: 0 };
+      return;
+    }
+
+    if (msg.action === 'photo_error') {
+      setStatus(`Erro na foto: ${msg.message}`);
+      setFotoCarregando(false);
+      return;
+    }
+
     if (msg.action === 'restarting') {
       setStatus('Telemóvel a mudar de modo...');
       limparConexao('A reiniciar...');
@@ -457,12 +1259,14 @@ function App() {
     try {
       if (pcRef.current !== pc) return;
       if (!pc || pc.signalingState === 'closed') return;
+      if (conectadoRef.current) return;
 
-      const offer = await pc.createOffer();
-      if (pcRef.current !== pc) return;
-
-      await pc.setLocalDescription(offer);
-      if (pcRef.current !== pc) return;
+      if (tentativa === 0) {
+        const offer = await pc.createOffer();
+        if (pcRef.current !== pc) return;
+        await pc.setLocalDescription(offer);
+        if (pcRef.current !== pc) return;
+      }
 
       const socket = wsRef.current;
       if (!socket || socket.readyState !== WebSocket.OPEN) {
@@ -473,7 +1277,8 @@ function App() {
         type: 'offer', target: 'android-001', sdp: pc.localDescription.sdp,
       }));
 
-      console.log(`Offer enviada (tentativa ${tentativa + 1}/${MAX_TENTATIVAS})`);
+      console.log(`Offer enviada (${tentativa + 1}/${MAX_TENTATIVAS})`);
+      setStatus(`Offer enviada (${tentativa + 1}/${MAX_TENTATIVAS}). A aguardar resposta...`);
 
       clearTimeout(offerRetryTimeoutRef.current);
       offerRetryTimeoutRef.current = setTimeout(() => {
@@ -483,17 +1288,12 @@ function App() {
 
         const proxima = tentativa + 1;
         if (proxima >= MAX_TENTATIVAS) {
-          console.warn('Máximo de tentativas atingido');
-          setStatus('Não foi possível ligar. Tenta novamente.');
+          setStatus('Não foi possível ligar após várias tentativas.');
           limparConexao('Falha após várias tentativas.');
           return;
         }
-
-        tentativasRef.current = proxima;
-        setStatus(`A tentar novamente (${proxima + 1}/${MAX_TENTATIVAS})...`);
         enviarOfferComRetry(pc, proxima);
-      }, 8000);
-
+      }, 3000);
     } catch (e) {
       console.error('Erro a enviar offer:', e);
     }
@@ -628,36 +1428,51 @@ function App() {
     };
   }, [iniciarWebSocket, token, tokenValido]);
 
+useEffect(() => {
+  const handleKeyDown = (e) => {
+    if (!conectadoRef.current) return;
+    if (!controloAtivo) return; // ← NOVA LINHA
+    if (dataChannelRef.current?.readyState !== 'open') return;
+    if (e.repeat) return;
+    if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt') return;
+    enviar({ action: 'key', key: e.key, code: e.code });
+    if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
+  };
+  window.addEventListener('keydown', handleKeyDown);
+  return () => window.removeEventListener('keydown', handleKeyDown);
+}, [enviar, controloAtivo]); // ← adiciona controloAtivo
+
+ useEffect(() => {
+  const video = videoRef.current;
+  if (!video) return;
+
+  const handler = (e) => {
+    if (!conectadoRef.current) return;
+    if (!controloAtivo) return; // ← NOVA LINHA
+    e.preventDefault();
+    const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+    const dx = e.deltaMode === 1 ? e.deltaX * 16 : e.deltaX;
+    enviar({
+      action: 'scroll',
+      deltaY: dy,
+      deltaX: dx,
+      preciso: e.shiftKey
+    });
+  };
+
+  video.addEventListener('wheel', handler, { passive: false });
+  return () => video.removeEventListener('wheel', handler);
+}, [enviar, tokenValido, conectado, controloAtivo]); // ← adiciona controloAtivo
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (!conectadoRef.current) return;
-      if (dataChannelRef.current?.readyState !== 'open') return;
-      if (e.repeat) return;
-      enviar({ action: 'key', key: e.key, code: e.code });
-      if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [enviar]);
+  if (vistaAtiva !== 'espelho' || !conectado) return;
+  const v = videoRef.current;
+  const s = remoteStreamRef.current;
+  if (v && s && v.srcObject !== s) {
+    v.srcObject = s;
+  }
+  if (v) v.play().catch(() => {});
+}, [vistaAtiva, conectado]);
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const handler = (e) => {
-      if (!conectadoRef.current) return;
-      e.preventDefault();
-      // Normalizar deltaY (varia entre browsers)
-      const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
-      const dx = e.deltaMode === 1 ? e.deltaX * 16 : e.deltaX;
-      enviar({ action: 'scroll', deltaY: dy, deltaX: dx });
-    };
-
-    video.addEventListener('wheel', handler, { passive: false });
-    return () => video.removeEventListener('wheel', handler);
-  }, [enviar, tokenValido, conectado]);   // ← adicionadas 2 deps
-
-  // ─── GRAVAÇÃO DE VÍDEO (2 modos) ───
   const iniciarGravacao = useCallback((modo = 'ecra') => {
     const video = videoRef.current;
     if (!video) return;
@@ -876,12 +1691,14 @@ function App() {
       canal.onmessage = tratarMensagemDataChannel;
 
       pc.ontrack = async (evento) => {
-        if (pcRef.current !== pc || !videoRef.current) return;
-        const video = videoRef.current;
-        if (evento.streams && evento.streams[0]) {
-          video.srcObject = evento.streams[0];
+        if (pcRef.current !== pc) return;
+        const stream = evento.streams?.[0];
+        if (!stream) return;
+        remoteStreamRef.current = stream;   // ← guarda o stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          try { await videoRef.current.play(); } catch {}
         }
-        try { await video.play(); } catch {}
       };
 
       pc.onicecandidate = (evento) => {
@@ -900,19 +1717,7 @@ function App() {
         }
       };
 
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      const socket = wsRef.current;
-      if (!socket || socket.readyState !== WebSocket.OPEN) {
-        throw new Error('WebSocket caiu');
-      }
-
-      socket.send(JSON.stringify({
-        type: 'offer', target: 'android-001', sdp: pc.localDescription.sdp,
-      }));
-
-      setStatus('Offer enviada. A aguardar resposta...');
+      enviarOfferComRetry(pc);
     } catch (erro) {
       console.error(erro);
       limparConexao(`Erro: ${erro.message}`);
@@ -946,6 +1751,7 @@ function App() {
 
   const onPointerDown = (e) => {
     if (!conectadoRef.current) return;
+     if (!controloAtivo) return;
     const coords = coordsRelativas(e);
     if (!coords) return;
     dragRef.current = {
@@ -974,14 +1780,12 @@ function App() {
     dragRef.current.ativo = false;
     if (!conectadoRef.current) return;
 
-    // Recalcular swipe com base no deslocamento final (apanha swipes rápidos)
     const dx = endX - startX;
     const dy = endY - startY;
     const deslocamento = Math.sqrt(dx * dx + dy * dy);
     const foiSwipe = arrastou || deslocamento > 0.02;
 
     if (foiSwipe) {
-      // Duração proporcional ao deslocamento (swipe mais longo = mais suave)
       const dur = Math.min(800, Math.max(300, Math.round(deslocamento * 1500)));
       enviar({ action: 'swipe', x1: startX, y1: startY, x2: endX, y2: endY, duration: dur });
     } else {
@@ -995,7 +1799,6 @@ function App() {
     } catch {}
   };
 
-  
   const corStatus = (() => {
     if (status.startsWith('⚠️') || status.toLowerCase().includes('erro') ||
         status.toLowerCase().includes('falhou') || status.toLowerCase().includes('desconect') ||
@@ -1190,6 +1993,7 @@ function App() {
             boxShadow: 'none',
           }}
         >
+          {!modoTV && (
           <header
             style={{
               display: 'flex',
@@ -1207,22 +2011,22 @@ function App() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div
-                style={{
-                  width: 32, height: 32, borderRadius: 9,
-                  background: 'linear-gradient(135deg, #2b7fff 0%, #7c3aed 100%)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 700, fontSize: 16,
-                  boxShadow: '0 4px 14px rgba(43,127,255,0.4)',
-                }}
-              >
-                L
-              </div>
+              style={{
+                width: 32, height: 32, borderRadius: 9,
+                background: 'linear-gradient(135deg, #2b7fff 0%, #7c3aed 100%)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontSize: 16,
+                boxShadow: '0 4px 14px rgba(43,127,255,0.4)',
+              }}
+            >
+              L
+            </div>
               <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
                 <span style={{ fontSize: 16, fontWeight: 600, letterSpacing: '-0.01em' }}>
                   LinkDroid
                 </span>
                 <span style={{ fontSize: 11, color: '#7a8ba3' }}>
-                  Espelhamento remoto
+                  Controlo remoto
                 </span>
               </div>
             </div>
@@ -1304,6 +2108,13 @@ function App() {
                   >
                     🔓
                   </button>
+                  <button
+                    onClick={() => setControloAtivo(v => !v)}
+                    className={`ld-btn icon ${controloAtivo ? 'som-on' : ''}`}
+                    title={controloAtivo ? 'Controlo remoto ATIVO (clica para só ver)' : 'Só a ver (clica para ativar controlo)'}
+                  >
+                    {controloAtivo ? '🎮' : '👀'}
+                  </button>
 
                   <button
                     onClick={() => {
@@ -1366,7 +2177,7 @@ function App() {
                     onClick={() => enviar({ action: 'request_history' })}
                     disabled={aCarregarHistorico}
                     className="ld-btn icon"
-                    title="Ver histórico completo (mesmo já enviadas)"
+                    title="Ver histórico"
                   >
                     {aCarregarHistorico ? (
                       <span
@@ -1411,7 +2222,6 @@ function App() {
                     🔄
                   </button>
 
-                  {/* ─── 2 BOTÕES DE GRAVAÇÃO ─── */}
                   <button
                     onClick={() => {
                       if (gravando) {
@@ -1445,258 +2255,376 @@ function App() {
               )}
             </div>
           </header>
+          )}
 
-          <main
-            style={{
-              flex: 1,
+          {conectado && !modoTV && (
+            <div style={{
               display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: 0,
-              minHeight: 0,
-              minWidth: 0,
-              overflow: 'hidden',
-              position: 'relative',
-            }}
-          >
-            {!conectado && (
-              <div
-                style={{
-                  position: 'absolute', inset: 0,
-                  display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center',
-                  gap: 14, pointerEvents: 'none', zIndex: 1,
-                }}
-              >
-                <div
+              gap: 4,
+              padding: '6px 10px',
+              background: 'rgba(15, 22, 38, 0.72)',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              flexShrink: 0,
+              overflowX: 'auto',
+            }}>
+             {[
+                { id: 'espelho', icon: '🖥️', label: 'Controlo Remoto' },
+                { id: 'tv', icon: '📺', label: 'Modo TV', acao: () => setModoTV(true) },
+                { id: 'mensagens', icon: '💬', label: 'Mensagens' },
+                { id: 'chamadas', icon: '📞', label: 'Chamadas' },
+                { id: 'fotos', icon: '📷', label: 'Fotos' },
+                
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    if (tab.acao) {
+                      tab.acao();
+                      return;
+                    }
+                    setVistaAtiva(tab.id);
+                    if (tab.id === 'mensagens' && smsThreads.length === 0) {
+                      setSmsLoading(true);
+                      enviar({ action: 'sms_threads' });
+                    }
+                    if (tab.id === 'chamadas' && chamadas.length === 0) {
+                      setChamadasLoading(true);
+                      enviar({ action: 'call_log', limit: 200 });
+                    }
+                    if (tab.id === 'fotos' && fotos.length === 0) {
+                      setFotosLoading(true);
+                      enviar({ action: 'photos_list', limit: 500 });
+                    }
+                  }}
                   style={{
-                    width: 90, height: 90, borderRadius: 24,
-                    background: 'linear-gradient(135deg, rgba(43,127,255,0.15) 0%, rgba(124,58,237,0.15) 100%)',
-                    border: '1px solid rgba(120,150,200,0.2)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 40, marginBottom: 4,
+                    padding: '8px 14px',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    background: (vistaAtiva === tab.id && !tab.acao)
+                      ? 'linear-gradient(135deg, #2b7fff 0%, #1a5fd6 100%)'
+                      : 'rgba(255,255,255,0.04)',
+                    color: (vistaAtiva === tab.id && !tab.acao) ? '#fff' : '#c8d3e3',
+                    border: '1px solid',
+                    borderColor: (vistaAtiva === tab.id && !tab.acao) ? 'transparent' : 'rgba(255,255,255,0.08)',
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease',
                   }}
                 >
-                  📱
-                </div>
-                <div style={{ fontSize: 15, color: '#8a9bb3', fontWeight: 500, textAlign: 'center', maxWidth: 320 }}>
-                  {ligando ? 'A estabelecer ligação com o telemóvel...'
-                    : iceConfigReady ? 'Clica em «Ligar ao telemóvel» para começar'
-                    : 'A aguardar o telemóvel...'}
-                </div>
-                <div style={{ fontSize: 12.5, color: '#5a6b83', textAlign: 'center', maxWidth: 360, lineHeight: 1.5 }}>
-                  Certifica-te que a app LinkDroid está aberta e a transmitir no telemóvel
-                </div>
-              </div>
-            )}
+                  {tab.icon} {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
 
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              onClick={async () => {
-                try { await videoRef.current?.play(); } catch {}
-              }}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={terminarPointer}
-              onPointerCancel={terminarPointer}
-              style={{
-                width: '100%',
-                height: '100%',
-                display: 'block',
-                cursor: conectado ? 'pointer' : 'default',
-                touchAction: 'none',
-                userSelect: 'none',
-                borderRadius: 0,
-                objectFit: 'contain',
-                background: '#000',
-                boxShadow: 'none',
-                opacity: conectado ? 1 : 0.15,
-                transition: 'opacity 0.4s ease',
-                position: 'relative',
-                zIndex: 2,
-              }}
-            />
-            {gravando && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 20,
-                  left: 20,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '6px 12px',
-                  background: 'rgba(255, 40, 60, 0.9)',
-                  borderRadius: 999,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: '#fff',
-                  boxShadow: '0 4px 16px rgba(255,40,60,0.5)',
-                  zIndex: 40,
-                  pointerEvents: 'none',
-                }}
-              >
-                <span
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: '50%',
-                    background: '#fff',
-                    animation: 'pulse-dot 1s infinite',
-                  }}
-                />
-                REC {modoGravacao === 'camera' ? '🎥' : '⏺️'} {formatarTempo(tempoGravacao)}
-              </div>
-            )}
-            {mostrarNotif && (
-              <div style={{
-                position: 'absolute', top: 60, right: 20,
-                width: 380, maxHeight: '70vh',
-                background: 'rgba(15, 22, 38, 0.95)',
-                backdropFilter: 'blur(14px)',
-                borderRadius: 16,
-                border: '1px solid rgba(120,180,255,0.3)',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-                zIndex: 50, overflow: 'hidden',
-                display: 'flex', flexDirection: 'column',
+          <main
+  style={{
+    flex: 1,
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 0,
+    minHeight: 0,
+    minWidth: 0,
+    overflow: 'hidden',
+    position: 'relative',
+  }}
+>
+  {/* ─── ESPELHAMENTO: SEMPRE MONTADO, só escondido ─── */}
+  <div
+    style={{
+      position: 'absolute',
+      inset: 0,
+      display: vistaAtiva === 'espelho' ? 'flex' : 'none',
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    }}
+  >
+    {!conectado && (
+      <div
+        style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          gap: 14, pointerEvents: 'none', zIndex: 1,
+        }}
+      >
+        <div
+          style={{
+            width: 90, height: 90, borderRadius: 24,
+            background: 'linear-gradient(135deg, rgba(43,127,255,0.15) 0%, rgba(124,58,237,0.15) 100%)',
+            border: '1px solid rgba(120,150,200,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 40, marginBottom: 4,
+          }}
+        >
+          📱
+        </div>
+        <div style={{ fontSize: 15, color: '#8a9bb3', fontWeight: 500, textAlign: 'center', maxWidth: 320 }}>
+          {ligando ? 'A estabelecer ligação com o telemóvel...'
+            : iceConfigReady ? 'Clica em «Ligar ao telemóvel» para começar'
+            : 'A aguardar o telemóvel...'}
+        </div>
+        <div style={{ fontSize: 12.5, color: '#5a6b83', textAlign: 'center', maxWidth: 360, lineHeight: 1.5 }}>
+          Certifica-te que a app LinkDroid está aberta e a transmitir no telemóvel
+        </div>
+      </div>
+    )}
+
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      onClick={async () => {
+        try { await videoRef.current?.play(); } catch {}
+      }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={terminarPointer}
+      onPointerCancel={terminarPointer}
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'block',
+        cursor: conectado ? 'pointer' : 'default',
+        touchAction: 'none',
+        userSelect: 'none',
+        objectFit: 'contain',
+        background: '#000',
+        opacity: conectado ? 1 : 0.15,
+        transition: 'opacity 0.4s ease',
+        position: 'relative',
+        zIndex: 2,
+      }}
+    />
+
+    {gravando && (
+      <div
+        style={{
+          position: 'absolute',
+          top: 20, left: 20,
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '6px 12px',
+          background: 'rgba(255, 40, 60, 0.9)',
+          borderRadius: 999,
+          fontSize: 13, fontWeight: 600, color: '#fff',
+          boxShadow: '0 4px 16px rgba(255,40,60,0.5)',
+          zIndex: 40,
+          pointerEvents: 'none',
+        }}
+      >
+        <span
+          style={{
+            width: 10, height: 10, borderRadius: '50%',
+            background: '#fff',
+            animation: 'pulse-dot 1s infinite',
+          }}
+        />
+        REC {modoGravacao === 'camera' ? '🎥' : '⏺️'} {formatarTempo(tempoGravacao)}
+      </div>
+    )}
+
+    {mostrarNotif && (
+      <div style={{
+        position: 'absolute', top: 60, right: 20,
+        width: 380, maxHeight: '70vh',
+        background: 'rgba(15, 22, 38, 0.95)',
+        backdropFilter: 'blur(14px)',
+        borderRadius: 16,
+        border: '1px solid rgba(120,180,255,0.3)',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+        zIndex: 50, overflow: 'hidden',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{
+          padding: '10px 14px',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          fontSize: 14, fontWeight: 600,
+        }}>
+          <span>
+            {aCarregarHistorico ? '📜 A carregar...' : '🔔 Notificações'} ({notificacoes.length})
+          </span>
+          <button
+            onClick={() => setNotificacoes([])}
+            style={{ background: 'none', border: 'none', color: '#ff6b7a', cursor: 'pointer', fontSize: 12 }}
+          >Limpar</button>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {notificacoes.length === 0 ? (
+            <div style={{ padding: 20, textAlign: 'center', color: '#7a8ba3', fontSize: 13 }}>
+              Sem notificações ainda.
+            </div>
+          ) : notificacoes.map(n => {
+            const textoMostrar = n.bigTexto || n.texto || '';
+            return (
+              <div key={n.id} style={{
+                padding: '10px 14px',
+                borderBottom: '1px solid rgba(255,255,255,0.04)',
+                fontSize: 12.5,
               }}>
-                <div style={{
-                  padding: '10px 14px',
-                  borderBottom: '1px solid rgba(255,255,255,0.08)',
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  fontSize: 14, fontWeight: 600,
-                }}>
-                  <span>
-                    {aCarregarHistorico ? '📜 A carregar...' : '🔔 Notificações'} ({notificacoes.length})
-                  </span>
-                  <button
-                    onClick={() => setNotificacoes([])}
-                    style={{ background: 'none', border: 'none', color: '#ff6b7a', cursor: 'pointer', fontSize: 12 }}
-                  >Limpar</button>
+                <div style={{ color: '#7ea2d4', fontSize: 11, marginBottom: 3 }}>
+                  {n.app}
                 </div>
-                <div style={{ overflowY: 'auto', flex: 1 }}>
-                  {notificacoes.length === 0 ? (
-                    <div style={{ padding: 20, textAlign: 'center', color: '#7a8ba3', fontSize: 13 }}>
-                      Sem notificações ainda.
-                    </div>
-                  ) : notificacoes.map(n => {
-                    // Preferir bigTexto (texto completo) se existir
-                    const textoMostrar = n.bigTexto || n.texto || '';
-                    return (
-                      <div key={n.id} style={{
-                        padding: '10px 14px',
-                        borderBottom: '1px solid rgba(255,255,255,0.04)',
-                        fontSize: 12.5,
-                      }}>
-                        <div style={{ color: '#7ea2d4', fontSize: 11, marginBottom: 3 }}>
-                          {n.app}
-                        </div>
-                        {n.titulo && <div style={{ fontWeight: 600, color: '#e8ecf3' }}>{n.titulo}</div>}
-                        {textoMostrar && (
-                          <div style={{ color: '#a8b4c8', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                            {textoMostrar}
-                          </div>
-                        )}
-                        {n.notifKey && (
-                          <button
-                            onClick={() => enviar({ action: 'open_notification', key: n.notifKey })}
-                            style={{
-                              marginTop: 6,
-                              padding: '4px 10px',
-                              fontSize: 11,
-                              background: 'rgba(43,127,255,0.15)',
-                              border: '1px solid rgba(43,127,255,0.35)',
-                              borderRadius: 6,
-                              color: '#8ec2ff',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            ↗ Abrir no telemóvel
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            {cameraStream && (
-              <div style={{
-                position: 'absolute',
-                bottom: 20, right: 20,
-                width: 320,
-                background: 'rgba(15, 22, 38, 0.95)',
-                backdropFilter: 'blur(14px)',
-                borderRadius: 16,
-                border: '1px solid rgba(120,180,255,0.3)',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-                zIndex: 50, overflow: 'hidden',
-              }}>
-                <div style={{
-                  padding: '8px 12px',
-                  borderBottom: '1px solid rgba(255,255,255,0.08)',
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  fontSize: 13, fontWeight: 600,
-                }}>
-                  <span>👁️ Câmara em direto</span>
+                {n.titulo && <div style={{ fontWeight: 600, color: '#e8ecf3' }}>{n.titulo}</div>}
+                {textoMostrar && (
+                  <div style={{ color: '#a8b4c8', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {textoMostrar}
+                  </div>
+                )}
+                {n.notifKey && (
                   <button
-                    onClick={() => {
-                      setCameraStream(false);
-                      enviar({ action: 'camera_stream_stop' });
-                    }}
+                    onClick={() => enviar({ action: 'open_notification', key: n.notifKey })}
                     style={{
-                      background: 'none', border: 'none',
-                      color: '#ff6b7a', cursor: 'pointer', fontSize: 12,
+                      marginTop: 6, padding: '4px 10px', fontSize: 11,
+                      background: 'rgba(43,127,255,0.15)',
+                      border: '1px solid rgba(43,127,255,0.35)',
+                      borderRadius: 6, color: '#8ec2ff', cursor: 'pointer',
                     }}
                   >
-                    Parar
+                    ↗ Abrir no telemóvel
                   </button>
-                </div>
-                <div style={{
-                  width: '100%',
-                  aspectRatio: '4 / 3',
-                  background: '#000',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                }}>
-                  {cameraFrameUrl ? (
-                    <img
-                      src={cameraFrameUrl}
-                      alt="Câmara em direto"
-                      style={{
-                        width: '100%', height: '100%',
-                        objectFit: 'contain', display: 'block',
-                      }}
-                    />
-                  ) : (
-                    <div style={{
-                      color: '#7a8ba3', fontSize: 13,
-                    }}>
-                      A aguardar frames...
-                    </div>
-                  )}
-                </div>
-                <div style={{
-                  display: 'flex',
-                  gap: 6,
-                  padding: '8px 12px',
-                  borderTop: '1px solid rgba(255,255,255,0.08)',
-                }}>
-                  <button
-                    onClick={() => enviar({ action: 'camera_switch' })}
-                    className="ld-btn"
-                    style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
-                  >
-                    🔄 Trocar câmara
-                  </button>
-                </div>
+                )}
               </div>
-            )}
-          </main>
+            );
+          })}
+        </div>
+      </div>
+    )}
+
+    {cameraStream && (
+      <div style={{
+        position: 'absolute', bottom: 20, right: 20,
+        width: 320,
+        background: 'rgba(15, 22, 38, 0.95)',
+        backdropFilter: 'blur(14px)',
+        borderRadius: 16,
+        border: '1px solid rgba(120,180,255,0.3)',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+        zIndex: 50, overflow: 'hidden',
+      }}>
+        <div style={{
+          padding: '8px 12px',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          fontSize: 13, fontWeight: 600,
+        }}>
+          <span>👁️ Câmara em direto</span>
+          <button
+            onClick={() => {
+              setCameraStream(false);
+              enviar({ action: 'camera_stream_stop' });
+            }}
+            style={{
+              background: 'none', border: 'none',
+              color: '#ff6b7a', cursor: 'pointer', fontSize: 12,
+            }}
+          >
+            Parar
+          </button>
+        </div>
+        <div style={{
+          width: '100%', aspectRatio: '4 / 3',
+          background: '#000',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflow: 'hidden',
+        }}>
+          {cameraFrameUrl ? (
+            <img
+              src={cameraFrameUrl}
+              alt="Câmara em direto"
+              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+            />
+          ) : (
+            <div style={{ color: '#7a8ba3', fontSize: 13 }}>A aguardar frames...</div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 6, padding: '8px 12px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <button
+            onClick={() => enviar({ action: 'camera_switch' })}
+            className="ld-btn"
+            style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
+          >
+            🔄 Trocar câmara
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+
+  {/* ─── OUTROS SEPARADORES (ficam iguais) ─── */}
+  {vistaAtiva === 'mensagens' && (
+    <VistaMensagens
+      conectado={conectado}
+      enviar={enviar}
+      smsThreads={smsThreads}
+      smsMensagens={smsMensagens}
+      smsSelecionado={smsSelecionado}
+      setSmsSelecionado={setSmsSelecionado}
+      smsInput={smsInput}
+      setSmsInput={setSmsInput}
+      smsLoading={smsLoading}
+      setSmsLoading={setSmsLoading}
+    />
+  )}
+
+  {vistaAtiva === 'chamadas' && (
+    <VistaChamadas
+      conectado={conectado}
+      enviar={enviar}
+      chamadas={chamadas}
+      chamadasLoading={chamadasLoading}
+      setChamadasLoading={setChamadasLoading}
+      chamadaSelecionada={chamadaSelecionada}
+      setChamadaSelecionada={setChamadaSelecionada}
+    />
+  )}
+
+  {vistaAtiva === 'fotos' && (
+    <VistaFotos
+      conectado={conectado}
+      enviar={enviar}
+      fotos={fotos}
+      fotosLoading={fotosLoading}
+      setFotosLoading={setFotosLoading}
+      fotoThumbs={fotoThumbs}
+      fotoAberta={fotoAberta}
+      setFotoAberta={setFotoAberta}
+      fotoCarregando={fotoCarregando}
+      setFotoCarregando={setFotoCarregando}
+      fotoPreviewUrl={fotoPreviewUrl}
+      setFotoPreviewUrl={setFotoPreviewUrl}
+      fotoBytes={fotoBytes}
+    />
+  )}
+</main>
+
+          {modoTV && (
+            <button
+              onClick={() => setModoTV(false)}
+              style={{
+                position: 'fixed',
+                top: 20,
+                right: 20,
+                zIndex: 100000,
+                padding: '10px 18px',
+                background: 'rgba(255, 77, 94, 0.9)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 999,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(255,77,94,0.5)',
+                backdropFilter: 'blur(8px)',
+              }}
+            >
+              ✕ Sair do Modo TV
+            </button>
+          )}
+
         </div>
       </div>
     </>
